@@ -100,7 +100,7 @@ class PaperTrader:
         if price <= 0 or atr <= 0:
             return False
 
-        invest = min(self.total_assets / 2, self.cash)
+        invest = min(self.total_assets / MAX_POSITIONS, self.cash)
         if invest < 1:
             return False
 
