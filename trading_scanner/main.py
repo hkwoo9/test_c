@@ -28,7 +28,7 @@ async def startup():
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    return (STATIC_DIR / "index.html").read_text()
+    return (STATIC_DIR / "index.html").read_text(encoding="utf-8")
 
 
 @app.get("/api/signals")
