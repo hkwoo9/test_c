@@ -82,7 +82,7 @@ class Scanner:
                     is_btc        = market == "KRW-BTC"
                     current_price = float(df_15m["close"].iloc[-1])
 
-                    trend  = supertrend(df_15m, period=10, multiplier=3.0)
+                    trend  = supertrend(df_15m, period=10, multiplier=2.5)
                     st_buy = bool(trend[-1] == 1)
 
                     is_long, score, detail = confluence_score(

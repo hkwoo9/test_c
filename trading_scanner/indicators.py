@@ -205,24 +205,25 @@ def confluence_score(
     c1 = bool(ema20[-1] > ema50[-1])
     details["EMA Trend"] = c1
 
-    # 2 ── Stochastic RSI crossover from oversold
+    # 2 ── Stochastic RSI: K > D (상태 기반) AND K < 50 (과매수 아님)
     k, d = _stoch_rsi(close)
-    if not np.isnan(k[-1]) and not np.isnan(d[-1]) and not np.isnan(k[-2]) and not np.isnan(d[-2]):
-        c2 = bool(k[-1] > d[-1] and k[-2] <= d[-2] and k[-1] < 20)
+    if not np.isnan(k[-1]) and not np.isnan(d[-1]):
+        c2 = bool(k[-1] > d[-1] and k[-1] < 50)
     else:
         c2 = False
     details["StochRSI"] = c2
 
-    # 3 ── MACD crossover (12/26/9)
+    # 3 ── MACD: MACD > Signal AND 히스토그램 양수 (상태 기반)
     ema12 = _ema(close, 12)
     ema26 = _ema(close, 26)
     macd  = ema12 - ema26
     sig   = _ema(macd, 9)
-    c3 = bool(macd[-1] > sig[-1] and macd[-2] <= sig[-2])
+    hist  = macd - sig
+    c3 = bool(macd[-1] > sig[-1] and hist[-1] > 0)
     details["MACD"] = c3
 
-    # 4 ── Liquidity: SSL sweep or near pivot low
-    ssl_active, _, near_lo, _ = _liquidity_signals(df_15m)
+    # 4 ── Liquidity: SSL sweep(20봉) or near pivot low(0.8%)
+    ssl_active, _, near_lo, _ = _liquidity_signals(df_15m, sweep_lb=20, tol=0.8)
     c4 = bool(ssl_active or near_lo)
     details["Liquidity"] = c4
 
@@ -271,7 +272,7 @@ def confluence_score(
         rel_e20  = _ema(rel, 20)
         rel_e50  = _ema(rel, 50)
         rel_up   = bool(rel_e20[-1] > rel_e50[-1])
-        c7 = bool(dom_falling and rel_up)
+        c7 = bool(rel_up)  # domFalling 제거: BTC 시즌에도 상대강도만으로 판단
     else:
         c7 = True
     details["Dominance/RS"] = c7
