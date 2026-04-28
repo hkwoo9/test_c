@@ -105,6 +105,33 @@
       text-align: center; padding: 60px 24px; color: var(--muted);
     }
     #empty-signals .icon, #empty-positions .icon, #empty-trades .icon { font-size: 40px; margin-bottom: 12px; }
+
+    /* ── Chart Modal ── */
+    #chart-modal {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.8); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center;
+    }
+    #chart-modal.open { display: flex; }
+    #chart-panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; width: 92vw; height: 88vh;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    #chart-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 11px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    #chart-header .left { display: flex; align-items: center; gap: 14px; }
+    #chart-coin-name { font-size: 18px; font-weight: 700; }
+    #chart-coin-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    #chart-close {
+      background: none; border: 1px solid var(--border); color: var(--text);
+      border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 13px;
+    }
+    #chart-close:hover { background: var(--border); }
+    #tv-chart { flex: 1; min-height: 0; }
+    tbody tr { cursor: pointer; }
   </style>
 </head>
 <body>
@@ -206,6 +233,27 @@
   </div>
 </div>
 
+<!-- TradingView Widget -->
+<script src="https://s3.tradingview.com/tv.js"></script>
+
+<!-- Chart Modal -->
+<div id="chart-modal" onclick="if(event.target===this)closeChart()">
+  <div id="chart-panel">
+    <div id="chart-header">
+      <div class="left">
+        <div>
+          <div id="chart-coin-name">-</div>
+          <div id="chart-coin-sub">-</div>
+        </div>
+        <div id="chart-coin-price" class="mono" style="font-size:15px">-</div>
+        <span class="badge buy">Supertrend BUY · Confluence ≥6/8 · 15분봉</span>
+      </div>
+      <button id="chart-close" onclick="closeChart()">✕ 닫기</button>
+    </div>
+    <div id="tv-chart"></div>
+  </div>
+</div>
+
 <script>
 /* ── constants ── */
 const COND_LABELS = {
@@ -231,6 +279,44 @@ function reasonBadge(r){
   if(r==='Supertrend 반전')   return `<span class="badge rev">ST 반전</span>`;
   return `<span class="badge">${r}</span>`;
 }
+
+/* ── chart modal ── */
+function toTVSymbol(market) {
+  const [quote, base] = market.split('-');
+  return `UPBIT:${base}${quote}`;   // KRW-BTC → UPBIT:BTCKRW
+}
+
+function openChart(market, coin, price) {
+  document.getElementById('chart-coin-name').textContent  = coin;
+  document.getElementById('chart-coin-sub').textContent   = market + ' · 15분봉';
+  document.getElementById('chart-coin-price').textContent = '₩' + fmtPrice(price);
+  document.getElementById('tv-chart').innerHTML = '';
+  document.getElementById('chart-modal').classList.add('open');
+
+  new TradingView.widget({
+    container_id:        'tv-chart',
+    symbol:              toTVSymbol(market),
+    interval:            '15',
+    timezone:            'Asia/Seoul',
+    theme:               'dark',
+    style:               '1',
+    locale:              'ko',
+    width:               '100%',
+    height:              '100%',
+    toolbar_bg:          '#161b22',
+    enable_publishing:   false,
+    hide_side_toolbar:   false,
+    allow_symbol_change: true,
+    save_image:          false,
+  });
+}
+
+function closeChart() {
+  document.getElementById('chart-modal').classList.remove('open');
+  document.getElementById('tv-chart').innerHTML = '';
+}
+
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeChart(); });
 
 /* ── tab switching ── */
 document.querySelectorAll('.tab').forEach(t => {
@@ -279,7 +365,7 @@ function renderSignals(signals, scanning, lastScan){
     const inPos = s.in_position
       ? `<span class="badge buy">보유중</span>`
       : `<span style="color:var(--muted);font-size:11px">-</span>`;
-    return `<tr>
+    return `<tr onclick="openChart('${s.market}','${s.coin}',${s.price})" title="클릭하면 차트 보기">
       <td class="muted">${i+1}</td>
       <td><div class="coin-name">${s.coin}</div><div class="muted">${s.market}</div></td>
       <td class="mono">₩${fmtPrice(s.price)}</td>
@@ -304,7 +390,7 @@ function renderPositions(positions){
 
   tbody.innerHTML = positions.map(p => {
     const pnl = p.pnl_krw||0, pnlP = p.pnl_pct||0;
-    return `<tr>
+    return `<tr onclick="openChart('${p.market}','${p.coin}',${p.current_price})" title="클릭하면 차트 보기">
       <td><div class="coin-name">${p.coin}</div><div class="muted">${p.market}</div></td>
       <td class="mono">₩${fmtPrice(p.entry_price)}</td>
       <td class="mono">₩${fmtPrice(p.current_price)}</td>
