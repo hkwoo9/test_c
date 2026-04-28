@@ -293,22 +293,37 @@ function openChart(market, coin, price) {
   document.getElementById('tv-chart').innerHTML = '';
   document.getElementById('chart-modal').classList.add('open');
 
-  new TradingView.widget({
-    container_id:        'tv-chart',
-    symbol:              toTVSymbol(market),
-    interval:            '15',
-    timezone:            'Asia/Seoul',
-    theme:               'dark',
-    style:               '1',
-    locale:              'ko',
-    width:               '100%',
-    height:              '100%',
-    toolbar_bg:          '#161b22',
-    enable_publishing:   false,
-    hide_side_toolbar:   false,
-    allow_symbol_change: true,
-    save_image:          false,
-  });
+  if (typeof TradingView === 'undefined') {
+    document.getElementById('tv-chart').innerHTML =
+      '<p style="color:var(--muted);text-align:center;padding:60px;font-size:13px">TradingView 스크립트를 불러오는 중입니다.<br>잠시 후 다시 클릭해주세요.</p>';
+    return;
+  }
+
+  // 모달이 완전히 렌더링된 후 픽셀 크기를 계산해서 위젯 생성
+  setTimeout(() => {
+    const panel  = document.getElementById('chart-panel');
+    const header = document.getElementById('chart-header');
+    const chartW = panel.clientWidth  || Math.floor(window.innerWidth  * 0.92);
+    const chartH = (panel.clientHeight || Math.floor(window.innerHeight * 0.88))
+                   - (header.clientHeight || 56);
+
+    new TradingView.widget({
+      container_id:        'tv-chart',
+      symbol:              toTVSymbol(market),
+      interval:            '15',
+      timezone:            'Asia/Seoul',
+      theme:               'dark',
+      style:               '1',
+      locale:              'ko',
+      width:               chartW,
+      height:              chartH,
+      toolbar_bg:          '#161b22',
+      enable_publishing:   false,
+      hide_side_toolbar:   false,
+      allow_symbol_change: true,
+      save_image:          false,
+    });
+  }, 80);
 }
 
 function closeChart() {
