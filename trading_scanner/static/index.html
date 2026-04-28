@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>업비트 매수 신호 스캐너</title>
+  <title>업비트 페이퍼 트레이딩</title>
   <style>
     :root {
       --bg:      #0d1117;
@@ -19,276 +19,378 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; font-size: 14px; }
 
+    /* ── Header ── */
     header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 24px; border-bottom: 1px solid var(--border);
+      padding: 14px 24px; border-bottom: 1px solid var(--border);
       background: var(--surface);
     }
-    header h1 { font-size: 18px; font-weight: 600; }
-    #status-bar { display: flex; gap: 16px; align-items: center; font-size: 12px; color: var(--muted); }
-    #scan-indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-    #scan-indicator.active { background: var(--green); animation: pulse 1.2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    header h1 { font-size: 17px; font-weight: 600; }
+    #status-bar { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--muted); }
+    .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .pulse.active { background: var(--green); animation: blink 1.2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot.on  { background: var(--green); }
+    .dot.off { background: var(--red); }
 
-    .stats-row {
-      display: flex; gap: 16px; padding: 16px 24px;
+    /* ── Tabs ── */
+    .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--surface); }
+    .tab {
+      padding: 10px 20px; cursor: pointer; font-size: 13px; color: var(--muted);
+      border-bottom: 2px solid transparent; transition: color .15s;
     }
-    .stat-card {
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--text); border-bottom-color: var(--blue); }
+
+    /* ── Portfolio cards ── */
+    .cards { display: flex; gap: 12px; padding: 16px 24px; flex-wrap: wrap; }
+    .card {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 8px; padding: 12px 20px; min-width: 140px;
+      border-radius: 8px; padding: 12px 18px; min-width: 130px;
     }
-    .stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
-    .stat-card .value { font-size: 24px; font-weight: 700; margin-top: 4px; color: var(--green); }
+    .card .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+    .card .val { font-size: 22px; font-weight: 700; margin-top: 4px; }
 
-    #progress-bar-wrap {
-      display: none; padding: 0 24px 12px;
-    }
-    #progress-bar-wrap.visible { display: block; }
-    #progress-track {
-      background: var(--border); border-radius: 4px; height: 4px; overflow: hidden;
-    }
-    #progress-fill {
-      height: 100%; background: var(--blue); width: 0%;
-      transition: width .3s ease;
-    }
-    #progress-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    /* ── Progress ── */
+    #prog-wrap { display: none; padding: 0 24px 10px; }
+    #prog-wrap.on { display: block; }
+    #prog-track { background: var(--border); border-radius: 4px; height: 4px; overflow: hidden; }
+    #prog-fill  { height: 100%; background: var(--blue); width: 0; transition: width .3s; }
+    #prog-lbl   { font-size: 11px; color: var(--muted); margin-top: 3px; }
 
-    .section-title { padding: 4px 24px 8px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    /* ── Section heading ── */
+    .sec-title { padding: 4px 24px 8px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
 
+    /* ── Tables ── */
+    .tbl-wrap { overflow-x: auto; padding: 0 24px 32px; }
     table { width: 100%; border-collapse: collapse; }
     thead tr { background: var(--surface); position: sticky; top: 0; z-index: 1; }
-    th {
-      padding: 10px 12px; text-align: left; font-size: 11px;
-      text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
-      border-bottom: 1px solid var(--border);
-    }
-    td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    tr:hover td { background: rgba(255,255,255,0.03); }
+    th { padding: 9px 11px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); border-bottom: 1px solid var(--border); }
+    td { padding: 9px 11px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:hover td { background: rgba(255,255,255,.03); }
 
-    .coin-name { font-weight: 600; font-size: 15px; }
-    .price { font-family: monospace; font-size: 13px; }
-    .chg { font-size: 12px; font-weight: 600; }
-    .chg.pos { color: var(--green); }
-    .chg.neg { color: var(--red); }
+    /* ── Misc helpers ── */
+    .coin-name { font-weight: 600; font-size: 14px; }
+    .mono { font-family: monospace; font-size: 13px; }
+    .pos { color: var(--green); font-weight: 600; }
+    .neg { color: var(--red);   font-weight: 600; }
+    .muted { color: var(--muted); font-size: 11px; }
 
     .badge {
       display: inline-block; padding: 2px 8px; border-radius: 12px;
-      font-size: 11px; font-weight: 600; letter-spacing: .3px;
+      font-size: 11px; font-weight: 600;
     }
-    .badge.green  { background: rgba(63,185,80,.15);  color: var(--green); }
-    .badge.yellow { background: rgba(210,153,34,.15); color: var(--yellow); }
+    .badge.buy   { background: rgba(63,185,80,.15);  color: var(--green); }
+    .badge.loss  { background: rgba(248,81,73,.12);  color: var(--red); }
+    .badge.tp    { background: rgba(88,166,255,.12); color: var(--blue); }
+    .badge.rev   { background: rgba(210,153,34,.12); color: var(--yellow); }
 
-    .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
-    .score-bar { width: 80px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
-    .score-fill { height: 100%; border-radius: 3px; background: var(--green); }
-    .score-text { font-size: 12px; color: var(--text); min-width: 28px; }
+    .bar-wrap { display: flex; align-items: center; gap: 7px; }
+    .bar { width: 72px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 3px; background: var(--green); }
 
-    .conditions { display: flex; gap: 4px; flex-wrap: wrap; }
+    .conds { display: flex; gap: 3px; flex-wrap: wrap; }
     .cond {
-      font-size: 10px; padding: 2px 6px; border-radius: 4px;
-      border: 1px solid transparent; white-space: nowrap;
+      font-size: 10px; padding: 2px 5px; border-radius: 4px;
+      border: 1px solid transparent;
     }
-    .cond.on  { background: rgba(63,185,80,.12); color: var(--green);  border-color: rgba(63,185,80,.3); }
-    .cond.off { background: rgba(139,148,158,.08); color: var(--muted); border-color: var(--border); }
+    .cond.on  { background: rgba(63,185,80,.1); color: var(--green); border-color: rgba(63,185,80,.25); }
+    .cond.off { background: rgba(139,148,158,.07); color: var(--muted); border-color: var(--border); }
 
-    .time-cell { font-size: 11px; color: var(--muted); }
+    .page-section { display: none; }
+    .page-section.active { display: block; }
 
-    #empty-state {
-      text-align: center; padding: 80px 24px; color: var(--muted);
+    #empty-signals, #empty-positions, #empty-trades {
+      text-align: center; padding: 60px 24px; color: var(--muted);
     }
-    #empty-state .icon { font-size: 48px; margin-bottom: 16px; }
-    #empty-state p { font-size: 15px; }
-    #empty-state small { font-size: 12px; }
-
-    .table-wrap { overflow-x: auto; padding: 0 24px 40px; }
-
-    .conn-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    .conn-dot.connected    { background: var(--green); }
-    .conn-dot.disconnected { background: var(--red); }
+    #empty-signals .icon, #empty-positions .icon, #empty-trades .icon { font-size: 40px; margin-bottom: 12px; }
   </style>
 </head>
 <body>
 
+<!-- Header -->
 <header>
-  <h1>🔍 업비트 매수 신호 스캐너</h1>
+  <h1>📊 업비트 페이퍼 트레이딩</h1>
   <div id="status-bar">
-    <span class="conn-dot disconnected" id="conn-dot"></span>
-    <span id="conn-label">연결 중...</span>
+    <span class="dot off" id="conn-dot"></span>
+    <span id="conn-lbl">연결 중...</span>
     <span>|</span>
-    <div id="scan-indicator"></div>
-    <span id="scan-label">대기 중</span>
+    <span class="pulse" id="scan-dot"></span>
+    <span id="scan-lbl">대기 중</span>
     <span>|</span>
-    <span id="last-scan-label">마지막 스캔: -</span>
+    <span id="last-scan">마지막 스캔: -</span>
   </div>
 </header>
 
-<div class="stats-row">
-  <div class="stat-card">
-    <div class="label">매수 신호</div>
-    <div class="value" id="stat-signals">0</div>
+<!-- Portfolio Summary Cards -->
+<div class="cards">
+  <div class="card">
+    <div class="lbl">총 자산</div>
+    <div class="val" id="c-total" style="color:var(--blue)">-</div>
   </div>
-  <div class="stat-card">
-    <div class="label">조건 (두 지표 모두)</div>
-    <div class="value" style="font-size:14px;margin-top:8px;color:var(--blue)">Supertrend Buy<br>+ Confluence ≥ 6/8</div>
+  <div class="card">
+    <div class="lbl">가용 현금</div>
+    <div class="val" id="c-cash" style="color:var(--text)">-</div>
   </div>
-  <div class="stat-card">
-    <div class="label">타임프레임</div>
-    <div class="value" style="font-size:18px;color:var(--yellow)">15분봉</div>
+  <div class="card">
+    <div class="lbl">누적 손익</div>
+    <div class="val" id="c-pnl">-</div>
   </div>
-  <div class="stat-card">
-    <div class="label">스캔 주기</div>
-    <div class="value" style="font-size:18px;color:var(--muted)">5분</div>
+  <div class="card">
+    <div class="lbl">수익률</div>
+    <div class="val" id="c-pct">-</div>
+  </div>
+  <div class="card">
+    <div class="lbl">보유 포지션</div>
+    <div class="val" id="c-pos" style="color:var(--yellow)">-</div>
   </div>
 </div>
 
-<div id="progress-bar-wrap">
-  <div id="progress-track"><div id="progress-fill"></div></div>
-  <div id="progress-label">스캔 중...</div>
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" data-tab="signals">매수 신호</div>
+  <div class="tab" data-tab="positions">현재 포지션</div>
+  <div class="tab" data-tab="trades">거래 이력</div>
 </div>
 
-<div class="section-title">실시간 매수 신호 (15분봉)</div>
+<!-- Progress -->
+<div id="prog-wrap">
+  <div id="prog-track"><div id="prog-fill"></div></div>
+  <div id="prog-lbl">스캔 중...</div>
+</div>
 
-<div class="table-wrap">
-  <div id="empty-state">
-    <div class="icon">📊</div>
-    <p>스캔 결과를 기다리는 중입니다.</p>
-    <small>첫 스캔은 서버 시작 직후 실행됩니다 (약 1~2분 소요).</small>
+<!-- ── Tab: 매수 신호 ─────────────────────────────────── -->
+<div class="page-section active" id="tab-signals">
+  <div class="sec-title">실시간 매수 신호 (Supertrend Buy + Confluence ≥ 6/8 · 15분봉)</div>
+  <div class="tbl-wrap">
+    <div id="empty-signals"><div class="icon">📡</div><p>첫 스캔 대기 중...</p></div>
+    <table id="tbl-signals" style="display:none">
+      <thead><tr>
+        <th>#</th><th>코인</th><th>현재가</th><th>24h</th>
+        <th>Supertrend</th><th>컨플루언스</th><th>조건</th><th>포지션</th><th>신호 시각</th>
+      </tr></thead>
+      <tbody id="body-signals"></tbody>
+    </table>
   </div>
-  <table id="signal-table" style="display:none">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>코인</th>
-        <th>현재가 (KRW)</th>
-        <th>24h 변동</th>
-        <th>Supertrend</th>
-        <th>컨플루언스</th>
-        <th>조건 상세</th>
-        <th>신호 시각</th>
-      </tr>
-    </thead>
-    <tbody id="signal-body"></tbody>
-  </table>
+</div>
+
+<!-- ── Tab: 현재 포지션 ───────────────────────────────── -->
+<div class="page-section" id="tab-positions">
+  <div class="sec-title">현재 보유 포지션 (최대 2개)</div>
+  <div class="tbl-wrap">
+    <div id="empty-positions"><div class="icon">💼</div><p>보유 중인 포지션 없음</p></div>
+    <table id="tbl-positions" style="display:none">
+      <thead><tr>
+        <th>코인</th><th>진입가</th><th>현재가</th><th>미실현 손익</th>
+        <th>손절가 (SL)</th><th>익절가 (TP)</th><th>투자금</th><th>컨플루언스</th><th>진입 시각</th>
+      </tr></thead>
+      <tbody id="body-positions"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Tab: 거래 이력 ─────────────────────────────────── -->
+<div class="page-section" id="tab-trades">
+  <div class="sec-title">거래 이력 (최신순 · trades.csv 저장)</div>
+  <div class="tbl-wrap">
+    <div id="empty-trades"><div class="icon">📋</div><p>체결된 거래 없음</p></div>
+    <table id="tbl-trades" style="display:none">
+      <thead><tr>
+        <th>#</th><th>코인</th><th>진입 시각</th><th>진입가</th>
+        <th>청산 시각</th><th>청산가</th><th>투자금</th><th>손익 (원)</th><th>수익률</th>
+        <th>청산 사유</th><th>컨플루언스</th>
+      </tr></thead>
+      <tbody id="body-trades"></tbody>
+    </table>
+  </div>
 </div>
 
 <script>
+/* ── constants ── */
 const COND_LABELS = {
-  "EMA Trend":    "EMA",
-  "StochRSI":     "StochRSI",
-  "MACD":         "MACD",
-  "Liquidity":    "유동성",
-  "Squeeze/KC":   "Squeeze",
-  "HTF Daily":    "일봉EMA",
-  "Dominance/RS": "도미넌스",
-  "BB Reclaim":   "BB회복",
+  "EMA Trend":"EMA","StochRSI":"StochRSI","MACD":"MACD",
+  "Liquidity":"유동성","Squeeze/KC":"Squeeze",
+  "HTF Daily":"일봉EMA","Dominance/RS":"도미넌스","BB Reclaim":"BB회복",
 };
 
-function fmt_price(p) {
-  if (p >= 1000) return p.toLocaleString('ko-KR', {maximumFractionDigits: 0});
-  if (p >= 1)    return p.toFixed(2);
+/* ── helpers ── */
+const fmt = (n, dec=0) => Number(n).toLocaleString('ko-KR',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+function fmtPrice(p){
+  p = +p;
+  if(p>=1000) return fmt(p,0);
+  if(p>=1)    return p.toFixed(2);
   return p.toFixed(6);
 }
+function pnlClass(v){ return +v >= 0 ? 'pos' : 'neg'; }
+function pnlSign(v){ return +v >= 0 ? '+' : ''; }
 
-function render(signals, lastScan, scanning) {
-  document.getElementById('stat-signals').textContent = signals.length;
-  document.getElementById('last-scan-label').textContent =
-    '마지막 스캔: ' + (lastScan || '-');
+function reasonBadge(r){
+  if(r==='익절')              return `<span class="badge tp">익절 ✓</span>`;
+  if(r==='손절')              return `<span class="badge loss">손절 ✗</span>`;
+  if(r==='Supertrend 반전')   return `<span class="badge rev">ST 반전</span>`;
+  return `<span class="badge">${r}</span>`;
+}
 
-  const ind = document.getElementById('scan-indicator');
-  const lbl = document.getElementById('scan-label');
-  if (scanning) {
-    ind.classList.add('active');
-    lbl.textContent = '스캔 중...';
-  } else {
-    ind.classList.remove('active');
-    lbl.textContent = '완료';
-  }
+/* ── tab switching ── */
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.page-section').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab-' + t.dataset.tab).classList.add('active');
+    if(t.dataset.tab === 'trades') loadTrades();
+  });
+});
 
-  const empty  = document.getElementById('empty-state');
-  const table  = document.getElementById('signal-table');
-  const tbody  = document.getElementById('signal-body');
+/* ── portfolio cards ── */
+function renderPortfolio(p){
+  if(!p) return;
+  document.getElementById('c-total').textContent = '₩' + fmt(p.total_assets);
+  document.getElementById('c-cash').textContent  = '₩' + fmt(p.cash);
+  const pnl = p.pnl_krw;
+  document.getElementById('c-pnl').innerHTML =
+    `<span class="${pnlClass(pnl)}">${pnlSign(pnl)}₩${fmt(pnl)}</span>`;
+  document.getElementById('c-pct').innerHTML =
+    `<span class="${pnlClass(p.pnl_pct)}">${pnlSign(p.pnl_pct)}${p.pnl_pct}%</span>`;
+  document.getElementById('c-pos').textContent =
+    `${p.position_count} / ${p.max_positions}`;
+}
 
-  if (!signals.length) {
-    empty.style.display = 'block';
-    table.style.display = 'none';
-    return;
-  }
+/* ── signals table ── */
+function renderSignals(signals, scanning, lastScan){
+  document.getElementById('last-scan').textContent = '마지막 스캔: ' + (lastScan||'-');
+  const dot = document.getElementById('scan-dot');
+  const lbl = document.getElementById('scan-lbl');
+  if(scanning){ dot.classList.add('active'); lbl.textContent='스캔 중...'; }
+  else         { dot.classList.remove('active'); lbl.textContent='완료'; }
 
-  empty.style.display = 'none';
-  table.style.display = 'table';
+  const empty = document.getElementById('empty-signals');
+  const tbl   = document.getElementById('tbl-signals');
+  const tbody = document.getElementById('body-signals');
 
-  tbody.innerHTML = signals.map((s, i) => {
-    const chgCls  = s.change_pct >= 0 ? 'pos' : 'neg';
-    const chgSign = s.change_pct >= 0 ? '+' : '';
-    const fillPct = (s.confluence / 8 * 100).toFixed(0);
+  if(!signals.length){ empty.style.display='block'; tbl.style.display='none'; return; }
+  empty.style.display='none'; tbl.style.display='table';
 
-    const conds = Object.entries(s.details || {}).map(([k, v]) => {
-      const label = COND_LABELS[k] || k;
-      return `<span class="cond ${v ? 'on' : 'off'}">${label}</span>`;
-    }).join('');
-
+  tbody.innerHTML = signals.map((s,i) => {
+    const conds = Object.entries(s.details||{}).map(([k,v])=>
+      `<span class="cond ${v?'on':'off'}">${COND_LABELS[k]||k}</span>`).join('');
+    const fillPct = (s.confluence/8*100).toFixed(0);
+    const inPos = s.in_position
+      ? `<span class="badge buy">보유중</span>`
+      : `<span style="color:var(--muted);font-size:11px">-</span>`;
     return `<tr>
-      <td style="color:var(--muted)">${i + 1}</td>
-      <td>
-        <div class="coin-name">${s.coin}</div>
-        <div style="font-size:11px;color:var(--muted)">${s.market}</div>
-      </td>
-      <td class="price">₩${fmt_price(s.price)}</td>
-      <td><span class="chg ${chgCls}">${chgSign}${s.change_pct}%</span></td>
-      <td><span class="badge green">BUY ▲</span></td>
-      <td>
-        <div class="score-bar-wrap">
-          <div class="score-bar"><div class="score-fill" style="width:${fillPct}%"></div></div>
-          <span class="score-text">${s.confluence}/8</span>
-        </div>
-      </td>
-      <td><div class="conditions">${conds}</div></td>
-      <td class="time-cell">${s.signal_time}</td>
+      <td class="muted">${i+1}</td>
+      <td><div class="coin-name">${s.coin}</div><div class="muted">${s.market}</div></td>
+      <td class="mono">₩${fmtPrice(s.price)}</td>
+      <td><span class="${pnlClass(s.change_pct)}">${pnlSign(s.change_pct)}${s.change_pct}%</span></td>
+      <td><span class="badge buy">BUY ▲</span></td>
+      <td><div class="bar-wrap"><div class="bar"><div class="bar-fill" style="width:${fillPct}%"></div></div><span style="font-size:12px">${s.confluence}/8</span></div></td>
+      <td><div class="conds">${conds}</div></td>
+      <td>${inPos}</td>
+      <td class="muted">${s.signal_time}</td>
     </tr>`;
   }).join('');
 }
 
-// ── WebSocket ──────────────────────────────────────────────────────────────
-function connect() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+/* ── positions table ── */
+function renderPositions(positions){
+  const empty = document.getElementById('empty-positions');
+  const tbl   = document.getElementById('tbl-positions');
+  const tbody = document.getElementById('body-positions');
+
+  if(!positions||!positions.length){ empty.style.display='block'; tbl.style.display='none'; return; }
+  empty.style.display='none'; tbl.style.display='table';
+
+  tbody.innerHTML = positions.map(p => {
+    const pnl = p.pnl_krw||0, pnlP = p.pnl_pct||0;
+    return `<tr>
+      <td><div class="coin-name">${p.coin}</div><div class="muted">${p.market}</div></td>
+      <td class="mono">₩${fmtPrice(p.entry_price)}</td>
+      <td class="mono">₩${fmtPrice(p.current_price)}</td>
+      <td><span class="${pnlClass(pnl)}">${pnlSign(pnl)}₩${fmt(pnl)} (${pnlSign(pnlP)}${pnlP}%)</span></td>
+      <td class="mono" style="color:var(--red)">₩${fmtPrice(p.stop_loss)}</td>
+      <td class="mono" style="color:var(--green)">₩${fmtPrice(p.take_profit)}</td>
+      <td class="mono">₩${fmt(p.invest_krw)}</td>
+      <td style="font-size:12px">${p.confluence}/8</td>
+      <td class="muted">${p.entry_time}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── trades table ── */
+async function loadTrades(){
+  const rows = await fetch('/api/trades').then(r=>r.json()).catch(()=>[]);
+  const empty = document.getElementById('empty-trades');
+  const tbl   = document.getElementById('tbl-trades');
+  const tbody = document.getElementById('body-trades');
+
+  if(!rows.length){ empty.style.display='block'; tbl.style.display='none'; return; }
+  empty.style.display='none'; tbl.style.display='table';
+
+  tbody.innerHTML = rows.map((t,i) => {
+    const pnl = +t.pnl_krw, pnlP = +t.pnl_pct;
+    return `<tr>
+      <td class="muted">${t.trade_id}</td>
+      <td><div class="coin-name">${t.coin}</div><div class="muted">${t.market}</div></td>
+      <td class="muted">${t.entry_time}</td>
+      <td class="mono">₩${fmtPrice(t.entry_price)}</td>
+      <td class="muted">${t.exit_time}</td>
+      <td class="mono">₩${fmtPrice(t.exit_price)}</td>
+      <td class="mono">₩${fmt(t.invest_krw)}</td>
+      <td><span class="${pnlClass(pnl)}">${pnlSign(pnl)}₩${fmt(pnl)}</span></td>
+      <td><span class="${pnlClass(pnlP)}">${pnlSign(pnlP)}${pnlP}%</span></td>
+      <td>${reasonBadge(t.exit_reason)}</td>
+      <td style="font-size:12px">${t.confluence}/8</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── WebSocket ── */
+function connect(){
+  const proto = location.protocol==='https:'?'wss':'ws';
   const ws    = new WebSocket(`${proto}://${location.host}/ws`);
   const dot   = document.getElementById('conn-dot');
-  const lbl   = document.getElementById('conn-label');
+  const lbl   = document.getElementById('conn-lbl');
 
-  ws.onopen = () => {
-    dot.className = 'conn-dot connected';
-    lbl.textContent = '연결됨';
-  };
+  ws.onopen = ()=>{ dot.className='dot on'; lbl.textContent='연결됨'; };
 
   ws.onmessage = e => {
     const msg = JSON.parse(e.data);
-    if (msg.type === 'signals') {
-      document.getElementById('progress-bar-wrap').classList.remove('visible');
-      render(msg.signals || [], msg.last_scan, msg.scanning);
-    } else if (msg.type === 'progress') {
-      const wrap = document.getElementById('progress-bar-wrap');
-      wrap.classList.add('visible');
-      const pct = (msg.scanned / msg.total * 100).toFixed(0);
-      document.getElementById('progress-fill').style.width = pct + '%';
-      document.getElementById('progress-label').textContent =
+
+    if(msg.type==='signals'){
+      document.getElementById('prog-wrap').classList.remove('on');
+      renderSignals(msg.signals||[], msg.scanning, msg.last_scan);
+      renderPortfolio(msg.portfolio);
+      renderPositions(msg.positions);
+      if(msg.closed_trades&&msg.closed_trades.length){
+        const active = document.querySelector('.tab.active').dataset.tab;
+        if(active==='trades') loadTrades();
+      }
+    } else if(msg.type==='progress'){
+      const wrap = document.getElementById('prog-wrap');
+      wrap.classList.add('on');
+      const pct = (msg.scanned/msg.total*100).toFixed(0);
+      document.getElementById('prog-fill').style.width = pct+'%';
+      document.getElementById('prog-lbl').textContent =
         `스캔 중... ${msg.scanned} / ${msg.total} (${pct}%)`;
-      document.getElementById('scan-indicator').classList.add('active');
-      document.getElementById('scan-label').textContent = '스캔 중...';
+      document.getElementById('scan-dot').classList.add('active');
+      document.getElementById('scan-lbl').textContent='스캔 중...';
     }
   };
 
-  ws.onclose = () => {
-    dot.className = 'conn-dot disconnected';
-    lbl.textContent = '연결 끊김 - 재연결 중...';
+  ws.onclose = ()=>{
+    dot.className='dot off'; lbl.textContent='연결 끊김 - 재연결 중...';
     setTimeout(connect, 3000);
   };
-
-  ws.onerror = () => ws.close();
+  ws.onerror = ()=> ws.close();
 }
 
-// ── Initial load via REST (before WS signals arrive) ──────────────────────
-fetch('/api/signals').then(r => r.json()).then(d => {
-  render(d.signals || [], d.last_scan, d.scanning);
+/* ── Initial REST load ── */
+fetch('/api/signals').then(r=>r.json()).then(d=>{
+  renderSignals(d.signals||[], d.scanning, d.last_scan);
+  renderPortfolio(d.portfolio);
+  renderPositions(d.positions||[]);
 });
 
 connect();
