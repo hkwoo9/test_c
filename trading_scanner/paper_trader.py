@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 PORTFOLIO_FILE  = Path(__file__).parent / "portfolio.json"
 TRADES_FILE     = Path(__file__).parent / "trades.csv"
-INITIAL_CAPITAL = 1_000_000   # 초기 가상 자본 (KRW)
-MAX_POSITIONS   = 2
+INITIAL_CAPITAL = 10_000_000  # 초기 가상 자본 (KRW)
+MAX_POSITIONS   = 10
 
 TRADES_HEADER = [
     "trade_id", "market", "coin",
