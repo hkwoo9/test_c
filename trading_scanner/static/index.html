@@ -453,6 +453,10 @@ function connect(){
         const active = document.querySelector('.tab.active').dataset.tab;
         if(active==='trades') loadTrades();
       }
+    } else if(msg.type==='price_update'){
+      // 10초마다 포지션 가격만 조용히 갱신
+      renderPortfolio(msg.portfolio);
+      renderPositions(msg.positions);
     } else if(msg.type==='progress'){
       const wrap = document.getElementById('prog-wrap');
       wrap.classList.add('on');
@@ -462,6 +466,8 @@ function connect(){
         `스캔 중... ${msg.scanned} / ${msg.total} (${pct}%)`;
       document.getElementById('scan-dot').classList.add('active');
       document.getElementById('scan-lbl').textContent='스캔 중...';
+    } else if(msg.type==='ping'){
+      // keep-alive, 무시
     }
   };
 

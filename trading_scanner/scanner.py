@@ -165,5 +165,37 @@ class Scanner:
                 self.is_scanning = False
             await asyncio.sleep(SCAN_INTERVAL)
 
+    async def run_price_stream(self):
+        """포지션 보유 중일 때 10초마다 현재가 갱신해서 클라이언트에 push."""
+        UPBIT_TICKER = "https://api.upbit.com/v1/ticker"
+        while True:
+            await asyncio.sleep(10)
+            try:
+                markets = list(paper_trader.positions.keys())
+                if not markets:
+                    continue
+
+                connector = aiohttp.TCPConnector(limit=5)
+                async with aiohttp.ClientSession(connector=connector) as session:
+                    async with session.get(
+                        UPBIT_TICKER,
+                        params={"markets": ",".join(markets)},
+                        timeout=aiohttp.ClientTimeout(total=5),
+                    ) as resp:
+                        if resp.status != 200:
+                            continue
+                        data = await resp.json()
+
+                for item in data:
+                    paper_trader.update_price(item["market"], float(item["trade_price"]))
+
+                await self._push({
+                    "type":      "price_update",
+                    "positions": paper_trader.get_positions(),
+                    "portfolio": paper_trader.get_summary(),
+                })
+            except Exception as e:
+                logger.debug(f"Price stream error: {e}")
+
 
 scanner = Scanner()

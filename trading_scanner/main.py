@@ -26,6 +26,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 @app.on_event("startup")
 async def startup():
     asyncio.create_task(scanner.run_forever())
+    asyncio.create_task(scanner.run_price_stream())
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -56,7 +57,7 @@ async def get_trades():
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
-    queue: asyncio.Queue = asyncio.Queue(maxsize=50)
+    queue: asyncio.Queue = asyncio.Queue(maxsize=100)
     scanner.subscribe(queue)
 
     await ws.send_text(json.dumps({
@@ -70,9 +71,13 @@ async def websocket_endpoint(ws: WebSocket):
 
     try:
         while True:
-            msg = await asyncio.wait_for(queue.get(), timeout=30)
-            await ws.send_text(json.dumps(msg))
-    except (WebSocketDisconnect, asyncio.TimeoutError):
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=20)
+                await ws.send_text(json.dumps(msg))
+            except asyncio.TimeoutError:
+                # keep-alive ping so browser doesn't close the connection
+                await ws.send_text(json.dumps({"type": "ping"}))
+    except WebSocketDisconnect:
         pass
     except Exception:
         pass
