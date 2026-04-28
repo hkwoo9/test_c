@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>업비트 매수 신호 스캐너</title>
+  <style>
+    :root {
+      --bg:      #0d1117;
+      --surface: #161b22;
+      --border:  #30363d;
+      --green:   #3fb950;
+      --red:     #f85149;
+      --yellow:  #d29922;
+      --blue:    #58a6ff;
+      --text:    #e6edf3;
+      --muted:   #8b949e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; font-size: 14px; }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 24px; border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    header h1 { font-size: 18px; font-weight: 600; }
+    #status-bar { display: flex; gap: 16px; align-items: center; font-size: 12px; color: var(--muted); }
+    #scan-indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    #scan-indicator.active { background: var(--green); animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .stats-row {
+      display: flex; gap: 16px; padding: 16px 24px;
+    }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 20px; min-width: 140px;
+    }
+    .stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .stat-card .value { font-size: 24px; font-weight: 700; margin-top: 4px; color: var(--green); }
+
+    #progress-bar-wrap {
+      display: none; padding: 0 24px 12px;
+    }
+    #progress-bar-wrap.visible { display: block; }
+    #progress-track {
+      background: var(--border); border-radius: 4px; height: 4px; overflow: hidden;
+    }
+    #progress-fill {
+      height: 100%; background: var(--blue); width: 0%;
+      transition: width .3s ease;
+    }
+    #progress-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    .section-title { padding: 4px 24px 8px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: var(--surface); position: sticky; top: 0; z-index: 1; }
+    th {
+      padding: 10px 12px; text-align: left; font-size: 11px;
+      text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:hover td { background: rgba(255,255,255,0.03); }
+
+    .coin-name { font-weight: 600; font-size: 15px; }
+    .price { font-family: monospace; font-size: 13px; }
+    .chg { font-size: 12px; font-weight: 600; }
+    .chg.pos { color: var(--green); }
+    .chg.neg { color: var(--red); }
+
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 12px;
+      font-size: 11px; font-weight: 600; letter-spacing: .3px;
+    }
+    .badge.green  { background: rgba(63,185,80,.15);  color: var(--green); }
+    .badge.yellow { background: rgba(210,153,34,.15); color: var(--yellow); }
+
+    .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .score-bar { width: 80px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .score-fill { height: 100%; border-radius: 3px; background: var(--green); }
+    .score-text { font-size: 12px; color: var(--text); min-width: 28px; }
+
+    .conditions { display: flex; gap: 4px; flex-wrap: wrap; }
+    .cond {
+      font-size: 10px; padding: 2px 6px; border-radius: 4px;
+      border: 1px solid transparent; white-space: nowrap;
+    }
+    .cond.on  { background: rgba(63,185,80,.12); color: var(--green);  border-color: rgba(63,185,80,.3); }
+    .cond.off { background: rgba(139,148,158,.08); color: var(--muted); border-color: var(--border); }
+
+    .time-cell { font-size: 11px; color: var(--muted); }
+
+    #empty-state {
+      text-align: center; padding: 80px 24px; color: var(--muted);
+    }
+    #empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    #empty-state p { font-size: 15px; }
+    #empty-state small { font-size: 12px; }
+
+    .table-wrap { overflow-x: auto; padding: 0 24px 40px; }
+
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .conn-dot.connected    { background: var(--green); }
+    .conn-dot.disconnected { background: var(--red); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🔍 업비트 매수 신호 스캐너</h1>
+  <div id="status-bar">
+    <span class="conn-dot disconnected" id="conn-dot"></span>
+    <span id="conn-label">연결 중...</span>
+    <span>|</span>
+    <div id="scan-indicator"></div>
+    <span id="scan-label">대기 중</span>
+    <span>|</span>
+    <span id="last-scan-label">마지막 스캔: -</span>
+  </div>
+</header>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="label">매수 신호</div>
+    <div class="value" id="stat-signals">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">조건 (두 지표 모두)</div>
+    <div class="value" style="font-size:14px;margin-top:8px;color:var(--blue)">Supertrend Buy<br>+ Confluence ≥ 6/8</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">타임프레임</div>
+    <div class="value" style="font-size:18px;color:var(--yellow)">15분봉</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">스캔 주기</div>
+    <div class="value" style="font-size:18px;color:var(--muted)">5분</div>
+  </div>
+</div>
+
+<div id="progress-bar-wrap">
+  <div id="progress-track"><div id="progress-fill"></div></div>
+  <div id="progress-label">스캔 중...</div>
+</div>
+
+<div class="section-title">실시간 매수 신호 (15분봉)</div>
+
+<div class="table-wrap">
+  <div id="empty-state">
+    <div class="icon">📊</div>
+    <p>스캔 결과를 기다리는 중입니다.</p>
+    <small>첫 스캔은 서버 시작 직후 실행됩니다 (약 1~2분 소요).</small>
+  </div>
+  <table id="signal-table" style="display:none">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>코인</th>
+        <th>현재가 (KRW)</th>
+        <th>24h 변동</th>
+        <th>Supertrend</th>
+        <th>컨플루언스</th>
+        <th>조건 상세</th>
+        <th>신호 시각</th>
+      </tr>
+    </thead>
+    <tbody id="signal-body"></tbody>
+  </table>
+</div>
+
+<script>
+const COND_LABELS = {
+  "EMA Trend":    "EMA",
+  "StochRSI":     "StochRSI",
+  "MACD":         "MACD",
+  "Liquidity":    "유동성",
+  "Squeeze/KC":   "Squeeze",
+  "HTF Daily":    "일봉EMA",
+  "Dominance/RS": "도미넌스",
+  "BB Reclaim":   "BB회복",
+};
+
+function fmt_price(p) {
+  if (p >= 1000) return p.toLocaleString('ko-KR', {maximumFractionDigits: 0});
+  if (p >= 1)    return p.toFixed(2);
+  return p.toFixed(6);
+}
+
+function render(signals, lastScan, scanning) {
+  document.getElementById('stat-signals').textContent = signals.length;
+  document.getElementById('last-scan-label').textContent =
+    '마지막 스캔: ' + (lastScan || '-');
+
+  const ind = document.getElementById('scan-indicator');
+  const lbl = document.getElementById('scan-label');
+  if (scanning) {
+    ind.classList.add('active');
+    lbl.textContent = '스캔 중...';
+  } else {
+    ind.classList.remove('active');
+    lbl.textContent = '완료';
+  }
+
+  const empty  = document.getElementById('empty-state');
+  const table  = document.getElementById('signal-table');
+  const tbody  = document.getElementById('signal-body');
+
+  if (!signals.length) {
+    empty.style.display = 'block';
+    table.style.display = 'none';
+    return;
+  }
+
+  empty.style.display = 'none';
+  table.style.display = 'table';
+
+  tbody.innerHTML = signals.map((s, i) => {
+    const chgCls  = s.change_pct >= 0 ? 'pos' : 'neg';
+    const chgSign = s.change_pct >= 0 ? '+' : '';
+    const fillPct = (s.confluence / 8 * 100).toFixed(0);
+
+    const conds = Object.entries(s.details || {}).map(([k, v]) => {
+      const label = COND_LABELS[k] || k;
+      return `<span class="cond ${v ? 'on' : 'off'}">${label}</span>`;
+    }).join('');
+
+    return `<tr>
+      <td style="color:var(--muted)">${i + 1}</td>
+      <td>
+        <div class="coin-name">${s.coin}</div>
+        <div style="font-size:11px;color:var(--muted)">${s.market}</div>
+      </td>
+      <td class="price">₩${fmt_price(s.price)}</td>
+      <td><span class="chg ${chgCls}">${chgSign}${s.change_pct}%</span></td>
+      <td><span class="badge green">BUY ▲</span></td>
+      <td>
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-fill" style="width:${fillPct}%"></div></div>
+          <span class="score-text">${s.confluence}/8</span>
+        </div>
+      </td>
+      <td><div class="conditions">${conds}</div></td>
+      <td class="time-cell">${s.signal_time}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws    = new WebSocket(`${proto}://${location.host}/ws`);
+  const dot   = document.getElementById('conn-dot');
+  const lbl   = document.getElementById('conn-label');
+
+  ws.onopen = () => {
+    dot.className = 'conn-dot connected';
+    lbl.textContent = '연결됨';
+  };
+
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'signals') {
+      document.getElementById('progress-bar-wrap').classList.remove('visible');
+      render(msg.signals || [], msg.last_scan, msg.scanning);
+    } else if (msg.type === 'progress') {
+      const wrap = document.getElementById('progress-bar-wrap');
+      wrap.classList.add('visible');
+      const pct = (msg.scanned / msg.total * 100).toFixed(0);
+      document.getElementById('progress-fill').style.width = pct + '%';
+      document.getElementById('progress-label').textContent =
+        `스캔 중... ${msg.scanned} / ${msg.total} (${pct}%)`;
+      document.getElementById('scan-indicator').classList.add('active');
+      document.getElementById('scan-label').textContent = '스캔 중...';
+    }
+  };
+
+  ws.onclose = () => {
+    dot.className = 'conn-dot disconnected';
+    lbl.textContent = '연결 끊김 - 재연결 중...';
+    setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+// ── Initial load via REST (before WS signals arrive) ──────────────────────
+fetch('/api/signals').then(r => r.json()).then(d => {
+  render(d.signals || [], d.last_scan, d.scanning);
+});
+
+connect();
+</script>
+</body>
+</html>
