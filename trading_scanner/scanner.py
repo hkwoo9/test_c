@@ -17,7 +17,7 @@ from upbit_api import (
 logger = logging.getLogger(__name__)
 
 SCAN_INTERVAL  = 300    # 5분
-MIN_CONFLUENCE = 6
+MIN_CONFLUENCE = 7
 REQUEST_DELAY  = 0.12   # ~8 req/s
 
 
@@ -82,7 +82,7 @@ class Scanner:
                     is_btc        = market == "KRW-BTC"
                     current_price = float(df_15m["close"].iloc[-1])
 
-                    trend  = supertrend(df_15m, period=10, multiplier=2.5)
+                    trend  = supertrend(df_15m, period=10, multiplier=3.0)
                     st_buy = bool(trend[-1] == 1)
 
                     is_long, score, detail = confluence_score(

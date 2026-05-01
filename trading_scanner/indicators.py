@@ -205,10 +205,10 @@ def confluence_score(
     c1 = bool(ema20[-1] > ema50[-1])
     details["EMA Trend"] = c1
 
-    # 2 ── Stochastic RSI: K > D (상태 기반) AND K < 50 (과매수 아님)
+    # 2 ── Stochastic RSI: K > D (상태 기반) AND K < 35 (반등 초기만 포착)
     k, d = _stoch_rsi(close)
     if not np.isnan(k[-1]) and not np.isnan(d[-1]):
-        c2 = bool(k[-1] > d[-1] and k[-1] < 50)
+        c2 = bool(k[-1] > d[-1] and k[-1] < 35)
     else:
         c2 = False
     details["StochRSI"] = c2
