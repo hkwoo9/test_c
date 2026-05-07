@@ -108,6 +108,7 @@ class PaperTrader:
         stop_dist   = max(atr * 1.5, price * 0.02)
         stop_loss   = price - stop_dist
         take_profit = price + stop_dist * 2.0
+                      
         self.cash -= invest
         self.positions[market] = {
             "market":        market,
