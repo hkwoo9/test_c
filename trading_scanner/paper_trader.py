@@ -139,7 +139,6 @@ class PaperTrader:
             "entry_time":    entry_time,
             "atr":           atr,
             "confluence":    confluence,
-            "st_bear_count": 0,
         }
         self._save_state()
         logger.info(
@@ -163,14 +162,7 @@ class PaperTrader:
         reason = None
 
         if not supertrend_bull:
-            # ST 약세 카운트 누적 → 2회 연속일 때만 청산
-            cnt = self.positions[market].get("st_bear_count", 0) + 1
-            self.positions[market]["st_bear_count"] = cnt
-            if cnt >= 6:  # 5분 스캔 × 6 = 30분 ≈ 15분봉 2봉 확인
-                reason = "Supertrend 반전"
-        else:
-            # ST가 다시 강세로 돌아오면 카운트 초기화
-            self.positions[market]["st_bear_count"] = 0
+            reason = "Supertrend 반전"
 
         if reason is None:
             if current_price <= self.positions[market]["stop_loss"]:
