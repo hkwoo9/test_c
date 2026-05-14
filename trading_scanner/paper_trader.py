@@ -10,6 +10,7 @@ PORTFOLIO_FILE  = Path(__file__).parent / "portfolio.json"
 TRADES_FILE     = Path(__file__).parent / "trades.csv"
 INITIAL_CAPITAL = 10_000_000  # 초기 가상 자본 (KRW)
 MAX_POSITIONS   = 10
+COOLDOWN_SECS   = 3600        # 동일 코인 재진입 쿨다운 1시간
 
 TRADES_HEADER = [
     "trade_id", "market", "coin",
@@ -26,6 +27,7 @@ class PaperTrader:
         self.cash:      float = float(INITIAL_CAPITAL)
         self.positions: dict  = {}
         self._trade_counter: int = 0
+        self._cooldown: dict  = {}  # market -> exit datetime
         self._load_state()
 
     # ── Persistence ──────────────────────────────────────────────────────────
@@ -33,9 +35,11 @@ class PaperTrader:
     def _load_state(self):
         if PORTFOLIO_FILE.exists():
             data = json.loads(PORTFOLIO_FILE.read_text(encoding="utf-8"))
-            self.cash            = float(data.get("cash", INITIAL_CAPITAL))
-            self.positions       = data.get("positions", {})
-            self._trade_counter  = int(data.get("trade_counter", 0))
+            self.cash           = float(data.get("cash", INITIAL_CAPITAL))
+            self.positions      = data.get("positions", {})
+            self._trade_counter = int(data.get("trade_counter", 0))
+            for market, ts in data.get("cooldown", {}).items():
+                self._cooldown[market] = datetime.fromisoformat(ts)
         else:
             self._save_state()
 
@@ -46,7 +50,12 @@ class PaperTrader:
     def _save_state(self):
         PORTFOLIO_FILE.write_text(
             json.dumps(
-                {"cash": self.cash, "positions": self.positions, "trade_counter": self._trade_counter},
+                {
+                    "cash":          self.cash,
+                    "positions":     self.positions,
+                    "trade_counter": self._trade_counter,
+                    "cooldown":      {m: dt.isoformat() for m, dt in self._cooldown.items()},
+                },
                 ensure_ascii=False, indent=2,
             ),
             encoding="utf-8",
@@ -100,15 +109,23 @@ class PaperTrader:
         if price <= 0 or atr <= 0:
             return False
 
+        # 동일 코인 재진입 쿨다운 체크
+        if market in self._cooldown:
+            elapsed = (datetime.now(timezone.utc) - self._cooldown[market]).total_seconds()
+            if elapsed < COOLDOWN_SECS:
+                remaining = int((COOLDOWN_SECS - elapsed) / 60)
+                logger.debug(f"COOLDOWN {market}  {remaining}분 남음")
+                return False
+
         invest = min(self.total_assets / MAX_POSITIONS, self.cash)
         if invest < 1:
             return False
 
         quantity    = invest / price
-        stop_dist   = max(atr * 1.5, price * 0.02)
+        stop_dist   = max(atr * 1.5, price * 0.02)  # 최소 2% 손절 보장
         stop_loss   = price - stop_dist
-        take_profit = price + stop_dist * 2.0
-                      
+        take_profit = price + stop_dist * 2.0        # RR=2.0 유지
+
         self.cash -= invest
         self.positions[market] = {
             "market":        market,
@@ -122,6 +139,7 @@ class PaperTrader:
             "entry_time":    entry_time,
             "atr":           atr,
             "confluence":    confluence,
+            "st_bear_count": 0,
         }
         self._save_state()
         logger.info(
@@ -143,12 +161,22 @@ class PaperTrader:
         self.positions[market]["current_price"] = current_price
 
         reason = None
+
         if not supertrend_bull:
-            reason = "Supertrend 반전"
-        elif current_price <= self.positions[market]["stop_loss"]:
-            reason = "손절"
-        elif current_price >= self.positions[market]["take_profit"]:
-            reason = "익절"
+            # ST 약세 카운트 누적 → 2회 연속일 때만 청산
+            cnt = self.positions[market].get("st_bear_count", 0) + 1
+            self.positions[market]["st_bear_count"] = cnt
+            if cnt >= 2:
+                reason = "Supertrend 반전"
+        else:
+            # ST가 다시 강세로 돌아오면 카운트 초기화
+            self.positions[market]["st_bear_count"] = 0
+
+        if reason is None:
+            if current_price <= self.positions[market]["stop_loss"]:
+                reason = "손절"
+            elif current_price >= self.positions[market]["take_profit"]:
+                reason = "익절"
 
         if reason:
             return self._close_position(market, current_price, reason)
@@ -164,6 +192,7 @@ class PaperTrader:
 
         self.cash += proceeds
         self._trade_counter += 1
+        self._cooldown[market] = datetime.now(timezone.utc)  # 쿨다운 시작
 
         trade = {
             "trade_id":    self._trade_counter,
